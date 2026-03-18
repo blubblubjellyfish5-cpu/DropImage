@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Image Drop</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg:           #050d0d;
+      --cyan:         #00d4c8;
+      --cyan-dim:     rgba(0, 212, 200, 0.12);
+      --glass-bg:     rgba(255, 255, 255, 0.04);
+      --glass-border: rgba(0, 212, 200, 0.25);
+      --text:         #f0fafa;
+      --muted:        rgba(255,255,255,0.4);
+      --danger:       #ff5e5e;
+
+      /* Safe area — iPhone notch/home bar ke liye */
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left:   env(safe-area-inset-left, 0px);
+      --safe-right:  env(safe-area-inset-right, 0px);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; } /* iOS pe text auto-zoom band */
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      min-height: -webkit-fill-available; /* iOS Safari height fix */
+      overflow-x: hidden;
+    }
+
+    /* =============================================
+       FULLSCREEN BUTTON
+       position:fixed — hamesha visible dono pages pe
+       Safe area ke andar rakha hai
+    ============================================= */
+    .fullscreen-btn {
+      position: fixed;
+      bottom: calc(28px + var(--safe-bottom));
+      left: calc(28px + var(--safe-left));
+      z-index: 99998;
+      width: 44px; height: 44px;
+      background: rgba(8,24,24,0.92);
+      border: 1px solid rgba(0,212,200,0.25);
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      transition: all 0.25s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      /* iOS pe tap highlight hatao */
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .fullscreen-btn:hover { border-color:var(--cyan); box-shadow:0 4px 24px rgba(0,212,200,0.2); }
+
+    .fullscreen-btn svg {
+      width: 18px; height: 18px;
+      stroke: var(--cyan); fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    /* =============================================
+       LOGIN PAGE
+    ============================================= */
+    #login-page {
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding: 24px;
+      padding-top: calc(24px + var(--safe-top));
+      padding-bottom: calc(24px + var(--safe-bottom));
+    }
+
+    .glow-blob { position:absolute; border-radius:50%; filter:blur(90px); pointer-events:none; }
+    .glow-blob.a { width:500px; height:500px; background:radial-gradient(circle, rgba(0,180,160,0.4) 0%, transparent 70%); top:-120px; left:-80px; }
+    .glow-blob.b { width:600px; height:500px; background:radial-gradient(circle, rgba(0,120,200,0.35) 0%, transparent 70%); bottom:-150px; right:-100px; }
+    .glow-blob.c { width:280px; height:280px; background:radial-gradient(circle, rgba(0,212,200,0.18) 0%, transparent 70%); top:45%; left:50%; transform:translate(-50%,-50%); }
+
+    .grid-bg {
+      position:absolute; inset:0;
+      background-image: linear-gradient(rgba(0,212,200,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,200,0.04) 1px, transparent 1px);
+      background-size: 56px 56px;
+      pointer-events:none;
+    }
+
+    /* Glassmorphism card
+       -webkit-backdrop-filter → Safari ke liye zaroori */
+    .login-card {
+      position: relative; z-index: 2;
+      width: 100%; max-width: 420px;
+      padding: 56px 48px 48px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      -webkit-backdrop-filter: blur(28px);
+      backdrop-filter: blur(28px);
+      box-shadow: 0 0 80px rgba(0,212,200,0.07), 0 40px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+    }
+
+    .login-card::before {
+      content:''; position:absolute; top:0; left:20%; right:20%; height:1px;
+      background:linear-gradient(90deg, transparent, var(--cyan), transparent);
+    }
+
+    .login-brand { text-align:center; margin-bottom:36px; }
+    .login-brand-sub { font-size:11px; letter-spacing:6px; text-transform:uppercase; color:var(--cyan); font-weight:500; margin-bottom:8px; }
+
+    .login-brand-name {
+      font-size: 44px; font-weight:900; letter-spacing:2px;
+      background:linear-gradient(135deg, #ffffff 20%, var(--cyan) 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text; line-height:1;
+    }
+
+    .login-welcome { text-align:center; font-size:14px; color:var(--muted); font-weight:300; margin-bottom:36px; }
+    .input-label { display:block; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; font-weight:500; }
+
+    .login-input {
+      width:100%; background:rgba(0,0,0,0.35);
+      border:1px solid rgba(0,212,200,0.2); border-radius:12px;
+      color:var(--text); padding:16px 20px; font-size:18px;
+      font-family:'Outfit',sans-serif; letter-spacing:4px;
+      outline:none; transition:border-color 0.3s, box-shadow 0.3s; margin-bottom:24px;
+      /* iOS pe zoom band — font-size 16px se kam ho toh iOS zoom karta hai */
+      font-size: 16px;
+    }
+
+    .login-input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,212,200,0.1); }
+
+    .login-btn {
+      width:100%; background:linear-gradient(135deg, #00d4c8 0%, #0090c0 100%);
+      color:#05100f; border:none; border-radius:12px; padding:18px;
+      font-family:'Outfit',sans-serif; font-size:16px; font-weight:700;
+      letter-spacing:2px; cursor:pointer; transition:all 0.3s;
+      box-shadow:0 10px 36px rgba(0,212,200,0.32);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .login-btn:hover { box-shadow:0 10px 48px rgba(0,212,200,0.52); transform:translateY(-2px); }
+    .login-btn:active { transform:translateY(0); }
+
+    .login-error {
+      margin-top:14px; color:var(--danger); font-size:12px; letter-spacing:1px;
+      text-align:center; display:none; padding:10px;
+      background:rgba(255,94,94,0.08); border-radius:8px;
+      border:1px solid rgba(255,94,94,0.2);
+    }
+
+    /* =============================================
+       DASHBOARD
+    ============================================= */
+    #dashboard-page { display:none; }
+
+    /* HEADER
+       padding-top mein safe-area — iPhone notch ke liye */
+    .header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 0 48px;
+      padding-left: calc(48px + var(--safe-left));
+      padding-right: calc(48px + var(--safe-right));
+      height: 68px;
+      background:rgba(5,13,13,0.9);
+      -webkit-backdrop-filter:blur(20px);
+      backdrop-filter:blur(20px);
+      border-bottom:1px solid rgba(0,212,200,0.1);
+      position:sticky; top:0; z-index:100;
+    }
+
+    .nav-logo { display:flex; align-items:center; gap:12px; }
+
+    .nav-dot {
+      width:8px; height:8px; background:var(--cyan); border-radius:50%;
+      box-shadow:0 0 10px var(--cyan); animation:pulse 2.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(0.75);} }
+
+    .nav-title { font-size:18px; font-weight:800; letter-spacing:4px; text-transform:uppercase; }
+    .nav-right { display:flex; align-items:center; gap:24px; }
+    .nav-count { font-size:12px; color:var(--muted); letter-spacing:2px; }
+    .nav-count strong { color:var(--cyan); }
+
+    .logout-btn {
+      background:transparent; border:1px solid rgba(0,212,200,0.2); color:var(--muted);
+      padding:8px 20px; border-radius:8px; font-size:11px; letter-spacing:2px;
+      text-transform:uppercase; cursor:pointer; font-family:'Outfit',sans-serif;
+      transition:all 0.25s; -webkit-tap-highlight-color:transparent;
+    }
+    .logout-btn:hover { border-color:var(--danger); color:var(--danger); }
+
+    /* HERO */
+    .hero {
+      position:relative;
+      padding: 52px 48px 44px;
+      padding-left: calc(48px + var(--safe-left));
+      padding-right: calc(48px + var(--safe-right));
+      border-bottom:1px solid rgba(0,212,200,0.07); overflow:hidden;
+    }
+
+    .hero::before {
+      content:''; position:absolute; top:-80px; left:-60px; width:500px; height:350px;
+      background:radial-gradient(ellipse, rgba(0,212,200,0.09) 0%, transparent 70%); pointer-events:none;
+    }
+
+    .hero-eyebrow { font-size:11px; letter-spacing:6px; text-transform:uppercase; color:var(--cyan); font-weight:500; margin-bottom:10px; }
+    .hero-title { font-size:clamp(52px,9vw,112px); font-weight:900; letter-spacing:-2px; line-height:0.92; margin-bottom:32px; }
+    .hero-title span { color:var(--cyan); }
+
+    .stats-strip { display:flex; width:fit-content; border:1px solid rgba(0,212,200,0.12); border-radius:14px; overflow:hidden; }
+    .stat-item { padding:14px 24px; border-right:1px solid rgba(0,212,200,0.1); text-align:center; }
+    .stat-item:last-child { border-right:none; }
+    .stat-num { display:block; font-size:20px; font-weight:800; color:var(--cyan); }
+    .stat-label { display:block; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+
+    /* UPLOAD */
+    .upload-section {
+      padding: 40px 48px;
+      padding-left: calc(48px + var(--safe-left));
+      padding-right: calc(48px + var(--safe-right));
+      border-bottom:1px solid rgba(0,212,200,0.07);
+    }
+
+    .section-label {
+      font-size:10px; letter-spacing:6px; text-transform:uppercase; color:var(--cyan);
+      font-weight:500; margin-bottom:16px; display:flex; align-items:center; gap:12px;
+    }
+    .section-label::after { content:''; height:1px; width:100px; background:linear-gradient(90deg, rgba(0,212,200,0.4), transparent); }
+
+    .drop-zone {
+      position:relative; border:1.5px dashed rgba(0,212,200,0.2); border-radius:20px;
+      background:rgba(0,212,200,0.015); padding:48px 32px; text-align:center;
+      cursor:pointer; transition:all 0.35s; overflow:hidden;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .drop-zone input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .drop-zone::before,.drop-zone::after { content:''; position:absolute; width:26px; height:26px; border-color:var(--cyan); border-style:solid; opacity:0.35; }
+    .drop-zone::before { top:14px; left:14px; border-width:2px 0 0 2px; border-radius:4px 0 0 0; }
+    .drop-zone::after  { bottom:14px; right:14px; border-width:0 2px 2px 0; border-radius:0 0 4px 0; }
+    .drop-zone.dragging { border-color:var(--cyan); background:var(--cyan-dim); box-shadow:0 0 50px rgba(0,212,200,0.12); }
+    .drop-zone.dragging .drop-title { color:var(--cyan); }
+    .drop-icon { font-size:44px; display:block; margin-bottom:14px; }
+    .drop-title { font-size:22px; font-weight:800; letter-spacing:3px; text-transform:uppercase; margin-bottom:8px; transition:color 0.3s; }
+    .drop-hint { color:var(--muted); font-size:13px; line-height:1.5; }
+
+    /* =============================================
+       UPLOAD MODAL
+    ============================================= */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,0.88);
+      -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+      z-index:5000; display:none; align-items:center; justify-content:center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display:flex; }
+
+    .modal-box {
+      position:relative; width:100%; max-width:480px;
+      background:#0b1e1e; border:1px solid var(--glass-border);
+      border-radius:20px; overflow:hidden;
+      animation:modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow:0 40px 80px rgba(0,0,0,0.7);
+      max-height: 90vh; overflow-y: auto;
+    }
+
+    @keyframes modalIn { from{transform:scale(0.9) translateY(20px);opacity:0;}to{transform:scale(1) translateY(0);opacity:1;} }
+
+    .modal-preview { width:100%; height:200px; object-fit:cover; display:block; background:#0a1a1a; }
+    .modal-body { padding:24px 28px 28px; }
+    .modal-progress-text { font-size:10px; letter-spacing:4px; text-transform:uppercase; color:var(--cyan); margin-bottom:14px; font-weight:500; }
+    .modal-original-name { font-size:11px; color:var(--muted); margin-bottom:18px; }
+    .modal-original-name span { color:rgba(255,255,255,0.6); }
+    .modal-label { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:10px; display:block; }
+
+    .modal-input {
+      width:100%; background:rgba(0,0,0,0.4);
+      border:1px solid rgba(0,212,200,0.2); border-radius:12px;
+      color:var(--text); padding:14px 18px; font-size:16px;
+      font-family:'Outfit',sans-serif; outline:none;
+      transition:border-color 0.3s, box-shadow 0.3s; margin-bottom:20px;
+    }
+    .modal-input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,212,200,0.1); }
+
+    .modal-actions { display:flex; gap:10px; }
+
+    .modal-btn-upload {
+      flex:1; background:linear-gradient(135deg, #00d4c8, #0090c0); color:#05100f;
+      border:none; border-radius:12px; padding:15px; font-family:'Outfit',sans-serif;
+      font-size:14px; font-weight:700; letter-spacing:2px; cursor:pointer;
+      transition:all 0.3s; box-shadow:0 8px 28px rgba(0,212,200,0.28);
+      -webkit-tap-highlight-color:transparent;
+    }
+    .modal-btn-upload:hover { transform:translateY(-1px); }
+
+    .modal-btn-skip {
+      background:transparent; border:1px solid rgba(255,255,255,0.1); color:var(--muted);
+      border-radius:12px; padding:15px 20px; font-family:'Outfit',sans-serif;
+      font-size:13px; cursor:pointer; transition:all 0.25s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .modal-btn-skip:hover { border-color:var(--danger); color:var(--danger); }
+
+    .modal-uploading { display:none; text-align:center; padding:8px 0; }
+    .modal-uploading.show { display:block; }
+
+    .upload-spinner {
+      display:inline-block; width:20px; height:20px;
+      border:2px solid rgba(0,212,200,0.2); border-top-color:var(--cyan);
+      border-radius:50%; animation:spin 0.7s linear infinite;
+      margin-right:8px; vertical-align:middle;
+    }
+    @keyframes spin { to{transform:rotate(360deg);} }
+
+    /* =============================================
+       RENAME MODAL
+    ============================================= */
+    .rename-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,0.88);
+      -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+      z-index:5000; display:none; align-items:center; justify-content:center;
+      padding: 20px;
+    }
+    .rename-overlay.open { display:flex; }
+
+    .rename-box {
+      width:100%; max-width:420px; background:#0b1e1e;
+      border:1px solid var(--glass-border); border-radius:20px; padding:32px 28px;
+      animation:modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    .rename-title { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--cyan); font-weight:500; margin-bottom:20px; }
+
+    .rename-input {
+      width:100%; background:rgba(0,0,0,0.4);
+      border:1px solid rgba(0,212,200,0.2); border-radius:12px;
+      color:var(--text); padding:14px 18px; font-size:16px;
+      font-family:'Outfit',sans-serif; outline:none;
+      transition:border-color 0.3s; margin-bottom:20px;
+    }
+    .rename-input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,212,200,0.1); }
+
+    .rename-actions { display:flex; gap:10px; }
+
+    .rename-btn-save {
+      flex:1; background:linear-gradient(135deg, #00d4c8, #0090c0); color:#05100f;
+      border:none; border-radius:12px; padding:14px; font-family:'Outfit',sans-serif;
+      font-size:14px; font-weight:700; letter-spacing:2px; cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .rename-btn-cancel {
+      background:transparent; border:1px solid rgba(255,255,255,0.1); color:var(--muted);
+      border-radius:12px; padding:14px 20px; font-family:'Outfit',sans-serif;
+      font-size:13px; cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    .rename-btn-cancel:hover { border-color:var(--danger); color:var(--danger); }
+
+    /* =============================================
+       GALLERY
+    ============================================= */
+    .gallery-section {
+      padding: 40px 48px 100px;
+      padding-left: calc(48px + var(--safe-left));
+      padding-right: calc(48px + var(--safe-right));
+      padding-bottom: calc(100px + var(--safe-bottom));
+    }
+
+    .gallery-header { margin-bottom:28px; }
+    .gallery-title { font-size:clamp(36px,6vw,70px); font-weight:900; letter-spacing:-1px; line-height:0.95; margin-bottom:8px; }
+    .gallery-title span { color:var(--cyan); }
+    .gallery-sub { font-size:12px; color:var(--muted); letter-spacing:2px; margin-bottom:20px; }
+
+    /* Search + Sort toolbar */
+    .gallery-toolbar { display:flex; gap:12px; align-items:center; }
+
+    .search-wrapper { flex:1; position:relative; }
+
+    .search-icon {
+      position:absolute; left:16px; top:50%; transform:translateY(-50%);
+      color:var(--muted); font-size:14px; pointer-events:none;
+    }
+
+    .search-input {
+      width:100%; background:rgba(0,0,0,0.3);
+      border:1px solid rgba(0,212,200,0.15); border-radius:12px;
+      color:var(--text); padding:13px 18px 13px 44px;
+      font-size:14px; font-family:'Outfit',sans-serif;
+      outline:none; transition:border-color 0.3s;
+    }
+    .search-input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,212,200,0.08); }
+    .search-input::placeholder { color:var(--muted); }
+
+    .sort-select {
+      background:rgba(0,0,0,0.3); border:1px solid rgba(0,212,200,0.15);
+      border-radius:12px; color:var(--text); padding:13px 18px;
+      font-size:13px; font-family:'Outfit',sans-serif; outline:none; cursor:pointer;
+    }
+    .sort-select:focus { border-color:var(--cyan); }
+
+    .search-results-count { font-size:12px; color:var(--cyan); letter-spacing:2px; margin-top:12px; display:none; }
+
+    /* Masonry grid
+       Desktop: 4 col | Tablet: 3 col | Phone: 2 col | Small phone: 1 col */
+    .gallery-grid { columns:4; column-gap:10px; }
+
+    .image-card {
+      break-inside:avoid; margin-bottom:10px; position:relative;
+      overflow:hidden; border-radius:14px;
+      background:rgba(0,212,200,0.03); border:1px solid rgba(0,212,200,0.08);
+      cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+
+    .image-card img { width:100%; display:block; transition:transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .image-card:hover img { transform:scale(1.05); }
+
+    .card-overlay {
+      position:absolute; inset:0;
+      background:linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.45) 55%, transparent 100%);
+      opacity:0; transition:opacity 0.3s;
+      display:flex; flex-direction:column; justify-content:flex-end;
+      padding:12px; border-radius:14px;
+    }
+
+    /* Mobile pe tap se dikhao — hover kaam nahi karta touch devices pe */
+    .image-card:hover .card-overlay,
+    .image-card.tapped .card-overlay { opacity:1; }
+
+    .card-filename { font-size:11px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
+    .card-date { font-size:10px; color:rgba(255,255,255,0.4); letter-spacing:1px; margin-bottom:8px; }
+
+    .card-actions { display:flex; gap:4px; flex-wrap:wrap; }
+
+    .card-btn {
+      background:rgba(255,255,255,0.09); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.14); color:#fff;
+      padding:6px 10px; border-radius:8px; font-size:10px;
+      letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+      font-family:'Outfit',sans-serif; text-decoration:none;
+      display:inline-block; transition:all 0.2s; font-weight:600;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    .card-btn:hover  { background:rgba(0,212,200,0.22); border-color:var(--cyan); }
+    .card-btn.del:hover { background:rgba(255,94,94,0.22); border-color:var(--danger); }
+    .card-btn.rename:hover { background:rgba(255,200,50,0.18); border-color:#ffc832; color:#ffc832; }
+
+    .state-msg { text-align:center; padding:60px 20px; }
+    .state-msg h3 { font-size:clamp(32px,6vw,48px); font-weight:900; letter-spacing:4px; color:rgba(0,212,200,0.12); margin-bottom:12px; }
+    .state-msg p { color:var(--muted); font-size:14px; letter-spacing:1px; }
+
+    /* =============================================
+       LIGHTBOX
+    ============================================= */
+    .lightbox {
+      position:fixed; inset:0; background:rgba(0,0,0,0.96);
+      -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+      z-index:9999; display:none; align-items:center; justify-content:center;
+      padding: 60px 20px 80px;
+    }
+    .lightbox.open { display:flex; }
+
+    .lightbox-img {
+      max-width:100%; max-height:100%; object-fit:contain; border-radius:12px;
+      animation:lbIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    @keyframes lbIn { from{transform:scale(0.88);opacity:0;}to{transform:scale(1);opacity:1;} }
+
+    .lightbox-close {
+      position:absolute; top:calc(20px + var(--safe-top)); right:calc(20px + var(--safe-right));
+      font-size:12px; font-weight:700; letter-spacing:3px; text-transform:uppercase;
+      color:var(--muted); cursor:pointer; padding:8px 16px;
+      border:1px solid rgba(255,255,255,0.1); border-radius:8px; transition:all 0.2s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .lightbox-close:hover { color:#fff; border-color:rgba(255,255,255,0.3); }
+
+    .lightbox-info {
+      position:absolute; bottom:calc(20px + var(--safe-bottom)); left:50%;
+      transform:translateX(-50%); text-align:center; pointer-events:none;
+      width: 90%;
+    }
+    .lightbox-name { font-size:14px; font-weight:600; color:rgba(255,255,255,0.8); letter-spacing:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lightbox-date { font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:2px; margin-top:4px; }
+
+    /* TOAST — safe area ke upar */
+    .toast {
+      position:fixed;
+      bottom: calc(32px + var(--safe-bottom));
+      right: calc(32px + var(--safe-right));
+      background:rgba(8,24,24,0.96); border:1px solid rgba(0,212,200,0.28);
+      border-radius:12px; padding:14px 20px; font-size:13px; z-index:99999;
+      display:none; animation:toastIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+      box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      max-width: calc(100vw - 64px - var(--safe-right));
+    }
+    .toast.err { border-color:rgba(255,94,94,0.35); }
+    @keyframes toastIn { from{transform:translateY(20px) scale(0.94);opacity:0;}to{transform:translateY(0) scale(1);opacity:1;} }
+
+    /* =============================================
+       RESPONSIVE — Tablet Portrait (768px se kam)
+    ============================================= */
+    @media (max-width: 900px) {
+      .header { padding: 0 28px; }
+      .hero { padding: 40px 28px 36px; }
+      .upload-section { padding: 32px 28px; }
+      .gallery-section { padding: 32px 28px 100px; }
+      .gallery-grid { columns: 3; }
+      .nav-title { letter-spacing: 2px; font-size: 16px; }
+    }
+
+    /* =============================================
+       RESPONSIVE — Phone Landscape + Tablet Portrait (600px)
+    ============================================= */
+    @media (max-width: 640px) {
+      .header {
+        padding: 0 20px;
+        height: 60px;
+      }
+
+      .nav-title { font-size: 14px; letter-spacing: 2px; }
+      .nav-count { display: none; } /* Space bachao — count hero mein bhi hai */
+      .logout-btn { padding: 7px 14px; font-size: 10px; }
+
+      .hero { padding: 32px 20px 28px; }
+      .hero-title { margin-bottom: 24px; }
+
+      .stats-strip { width: 100%; }
+      .stat-item { flex: 1; padding: 12px 12px; }
+      .stat-num { font-size: 18px; }
+      .stat-label { font-size: 9px; }
+
+      .upload-section { padding: 28px 20px; }
+      .drop-zone { padding: 36px 20px; }
+      .drop-icon { font-size: 36px; margin-bottom: 12px; }
+      .drop-title { font-size: 18px; letter-spacing: 2px; }
+      .drop-hint { font-size: 12px; }
+
+      .gallery-section { padding: 28px 20px 100px; }
+      .gallery-grid { columns: 2; column-gap: 8px; }
+      .image-card { margin-bottom: 8px; }
+
+      /* Search + Sort — ek ke neeche ek stack ho jaata hai */
+      .gallery-toolbar { flex-direction: column; align-items: stretch; }
+      .sort-select { width: 100%; }
+
+      .fullscreen-btn { width: 40px; height: 40px; bottom: 20px; left: 20px; }
+    }
+
+    /* =============================================
+       RESPONSIVE — Small Phone (380px se kam)
+    ============================================= */
+    @media (max-width: 380px) {
+      .login-card { padding: 40px 28px 36px; }
+      .login-brand-name { font-size: 36px; }
+      .gallery-grid { columns: 1; }
+      .stat-label { display: none; } /* Bahut chhota — label chhupao }
+    }
+
+    /* =============================================
+       RESPONSIVE — Phone Landscape (height kam, width zyada)
+       orientation: landscape → horizontally held phone
+    ============================================= */
+    @media (max-height: 500px) and (orientation: landscape) {
+      #login-page { align-items: flex-start; overflow-y: auto; }
+      .login-card { margin: 20px auto; padding: 32px 36px; }
+      .login-brand { margin-bottom: 20px; }
+      .login-brand-name { font-size: 36px; }
+      .login-welcome { margin-bottom: 20px; font-size: 13px; }
+      .login-input { padding: 12px 18px; margin-bottom: 16px; }
+      .login-btn { padding: 14px; }
+      .glow-blob { display: none; } /* Performance ke liye landscape pe hatao */
+    }
+
+    /* =============================================
+       iOS Safari specific fixes
+    ============================================= */
+    @supports (-webkit-touch-callout: none) {
+      /* iOS pe position:fixed ke saath keyboard aane pe layout fix */
+      .modal-overlay,
+      .rename-overlay {
+        position: fixed;
+        height: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- FULLSCREEN BUTTON — hamesha visible, dono pages pe -->
+  <button class="fullscreen-btn" id="fullscreen-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+    <svg id="fs-icon-enter" viewBox="0 0 24 24">
+      <polyline points="15 3 21 3 21 9"></polyline>
+      <polyline points="9 21 3 21 3 15"></polyline>
+      <line x1="21" y1="3" x2="14" y2="10"></line>
+      <line x1="3" y1="21" x2="10" y2="14"></line>
+    </svg>
+    <svg id="fs-icon-exit" viewBox="0 0 24 24" style="display:none">
+      <polyline points="4 14 10 14 10 20"></polyline>
+      <polyline points="20 10 14 10 14 4"></polyline>
+      <line x1="10" y1="14" x2="3" y2="21"></line>
+      <line x1="21" y1="3" x2="14" y2="10"></line>
+    </svg>
+  </button>
+
+  <!-- LOGIN PAGE -->
+  <div id="login-page">
+    <div class="glow-blob a"></div>
+    <div class="glow-blob b"></div>
+    <div class="glow-blob c"></div>
+    <div class="grid-bg"></div>
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-brand-sub">Personal Vault</div>
+        <div class="login-brand-name">IMAGE DROP</div>
+      </div>
+      <div class="login-welcome">Welcome back — enter your password to continue</div>
+      <label class="input-label">Password</label>
+      <input type="password" id="pw-input" class="login-input"
+        placeholder="••••••••••••"
+        onkeydown="if(event.key==='Enter') login()"
+        autocomplete="current-password"
+        autofocus>
+      <button class="login-btn" onclick="login()">Login</button>
+      <div class="login-error" id="login-err">Incorrect password. Please try again.</div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard-page">
+    <div class="header">
+      <div class="nav-logo">
+        <div class="nav-dot"></div>
+        <div class="nav-title">Image Drop</div>
+      </div>
+      <div class="nav-right">
+        <div class="nav-count"><strong id="count">0</strong> Images</div>
+        <button class="logout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-eyebrow">Personal Cloud Storage</div>
+      <div class="hero-title">IMAGE<br><span>DROP</span></div>
+      <div class="stats-strip">
+        <div class="stat-item"><span class="stat-num" id="stat-total">0</span><span class="stat-label">Photos</span></div>
+        <div class="stat-item"><span class="stat-num">∞</span><span class="stat-label">Storage</span></div>
+        <div class="stat-item"><span class="stat-num">Free</span><span class="stat-label">Forever</span></div>
+      </div>
+    </div>
+
+    <div class="upload-section">
+      <div class="section-label">Upload</div>
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(this.files)">
+        <span class="drop-icon">📸</span>
+        <div class="drop-title">Drop Your Images Here</div>
+        <div class="drop-hint">Tap to browse or drag & drop — JPG, PNG, GIF, WEBP (max 32MB)</div>
+      </div>
+    </div>
+
+    <div class="gallery-section">
+      <div class="gallery-header">
+        <div class="gallery-title">MY <span>GALLERY</span></div>
+        <div class="gallery-sub" id="gallery-sub">Loading your images...</div>
+        <div class="gallery-toolbar">
+          <div class="search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" class="search-input"
+              placeholder="Search by image name..."
+              oninput="filterGallery()">
+          </div>
+          <select class="sort-select" id="sort-select" onchange="filterGallery()">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="az">Name A → Z</option>
+            <option value="za">Name Z → A</option>
+          </select>
+        </div>
+        <div class="search-results-count" id="search-results-count"></div>
+      </div>
+
+      <div id="state-loading" class="state-msg"><p>Loading your images, please wait...</p></div>
+      <div id="state-empty" class="state-msg" style="display:none">
+        <h3>NO IMAGES</h3>
+        <p>Your vault is empty. Upload an image to get started.</p>
+      </div>
+      <div id="state-no-results" class="state-msg" style="display:none">
+        <h3>NO RESULTS</h3>
+        <p>No images found matching your search.</p>
+      </div>
+      <div class="gallery-grid" id="gallery-grid"></div>
+    </div>
+  </div>
+
+  <!-- UPLOAD MODAL -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <img class="modal-preview" id="modal-preview-img" src="" alt="Preview">
+      <div class="modal-body">
+        <div class="modal-progress-text" id="modal-progress-text">Image 1 of 1</div>
+        <div class="modal-original-name">Original: <span id="modal-original-name">—</span></div>
+        <label class="modal-label">Enter a name for this image</label>
+        <input type="text" id="modal-name-input" class="modal-input"
+          placeholder="e.g. Sunset, Birthday Party..."
+          onkeydown="if(event.key==='Enter') uploadCurrent()">
+        <div class="modal-uploading" id="modal-uploading">
+          <span class="upload-spinner"></span>
+          <span style="color:var(--muted);font-size:13px;">Uploading, please wait...</span>
+        </div>
+        <div class="modal-actions" id="modal-actions">
+          <button class="modal-btn-upload" onclick="uploadCurrent()">Upload</button>
+          <button class="modal-btn-skip" onclick="skipCurrent()">Skip</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RENAME MODAL -->
+  <div class="rename-overlay" id="rename-overlay">
+    <div class="rename-box">
+      <div class="rename-title">Rename Image</div>
+      <input type="text" id="rename-input" class="rename-input"
+        placeholder="Enter new name..."
+        onkeydown="if(event.key==='Enter') saveRename()">
+      <div class="rename-actions">
+        <button class="rename-btn-save" onclick="saveRename()">Save</button>
+        <button class="rename-btn-cancel" onclick="closeRename()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox" id="lightbox">
+    <div class="lightbox-close" onclick="closeLightbox()">✕ &nbsp; Close</div>
+    <img class="lightbox-img" id="lightbox-img" src="" alt="" onclick="closeLightbox()">
+    <div class="lightbox-info">
+      <div class="lightbox-name" id="lightbox-name"></div>
+      <div class="lightbox-date" id="lightbox-date"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const CONFIG = {
+      supabaseUrl : 'https://jpmnelsiltgrtjmhpixy.supabase.co',
+      supabaseKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwbW5lbHNpbHRncnRqbWhwaXh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3NDkwOTAsImV4cCI6MjA4OTMyNTA5MH0.MKgf_963FuYykq9NsLVUr-0I3_y9guMdWcKRf_K_vCo',
+      imgbbKey    : '5db7aefd0430d49343e46a4659e96730',
+      password    : 'khuljaphoto',
+      table       : 'image_drop'
+    };
+
+    let allImages    = [];
+    let uploadQueue  = [];
+    let currentFile  = null;
+    let currentIndex = 0;
+    let totalFiles   = 0;
+    let renameId     = null;
+
+    // ============================================================
+    // FULLSCREEN
+    // Safari mein webkitFullscreenElement use karna padta hai
+    // ============================================================
+    function toggleFullscreen() {
+      const isFS = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!isFS) {
+        // Enter fullscreen — webkit prefix Safari ke liye
+        const el = document.documentElement;
+        if (el.requestFullscreen)       el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen)       document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    }
+
+    // Fullscreen change — webkit event bhi sun
+    ['fullscreenchange', 'webkitfullscreenchange'].forEach(evt => {
+      document.addEventListener(evt, () => {
+        const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        document.getElementById('fs-icon-enter').style.display = isFS ? 'none'  : 'block';
+        document.getElementById('fs-icon-exit').style.display  = isFS ? 'block' : 'none';
+      });
+    });
+
+    // ============================================================
+    // TOUCH — Mobile pe card tap se overlay toggle karo
+    // Hover touch devices pe kaam nahi karta
+    // ============================================================
+    document.addEventListener('click', (e) => {
+      const card = e.target.closest('.image-card');
+      if (!card) {
+        // Card ke bahar click — sab cards ka tapped class hatao
+        document.querySelectorAll('.image-card.tapped').forEach(c => c.classList.remove('tapped'));
+        return;
+      }
+      // Button pe click ho toh toggle mat karo
+      if (e.target.closest('.card-btn')) return;
+      // Image pe click karo — agar overlay nahi dikh raha toh dikhao
+      if (!card.classList.contains('tapped')) {
+        document.querySelectorAll('.image-card.tapped').forEach(c => c.classList.remove('tapped'));
+        card.classList.add('tapped');
+        e.stopPropagation();
+      }
+    });
+
+    // ============================================================
+    // LOGIN
+    // ============================================================
+    function login() {
+      const val = document.getElementById('pw-input').value;
+      if (val === CONFIG.password) {
+        document.getElementById('login-page').style.display    = 'none';
+        document.getElementById('dashboard-page').style.display = 'block';
+        loadImages();
+      } else {
+        const input = document.getElementById('pw-input');
+        document.getElementById('login-err').style.display = 'block';
+        input.value = '';
+        input.style.borderColor = '#ff5e5e';
+        setTimeout(() => { input.style.borderColor = ''; }, 1500);
+      }
+    }
+
+    function logout() {
+      document.getElementById('dashboard-page').style.display = 'none';
+      document.getElementById('login-page').style.display     = 'flex';
+      document.getElementById('pw-input').value = '';
+      document.getElementById('login-err').style.display = 'none';
+      document.getElementById('search-input').value = '';
+      document.getElementById('sort-select').value  = 'newest';
+    }
+
+    // ============================================================
+    // DRAG & DROP
+    // ============================================================
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragging'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); dropZone.classList.remove('dragging');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    // ============================================================
+    // FILE HANDLER
+    // ============================================================
+    function handleFiles(files) {
+      if (!files || !files.length) return;
+      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+      if (!imageFiles.length) { showToast('No valid image files found.', true); return; }
+      uploadQueue = imageFiles; currentIndex = 0; totalFiles = imageFiles.length;
+      openModal(uploadQueue[0], 0);
+    }
+
+    // ============================================================
+    // UPLOAD MODAL
+    // ============================================================
+    function openModal(file, index) {
+      currentFile = file;
+      document.getElementById('modal-progress-text').textContent = `Image ${index + 1} of ${totalFiles}`;
+      document.getElementById('modal-original-name').textContent = file.name;
+      const nameInput = document.getElementById('modal-name-input');
+      nameInput.value = file.name.replace(/\.[^/.]+$/, '');
+      const reader = new FileReader();
+      reader.onload = (e) => { document.getElementById('modal-preview-img').src = e.target.result; };
+      reader.readAsDataURL(file);
+      document.getElementById('modal-actions').style.display = 'flex';
+      document.getElementById('modal-uploading').classList.remove('show');
+      document.getElementById('modal-overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => { nameInput.focus(); }, 350);
+    }
+
+    async function uploadCurrent() {
+      const nameInput = document.getElementById('modal-name-input');
+      const customName = nameInput.value.trim();
+      if (!customName) {
+        nameInput.style.borderColor = '#ff5e5e';
+        setTimeout(() => { nameInput.style.borderColor = ''; }, 1500);
+        return;
+      }
+      document.getElementById('modal-actions').style.display = 'none';
+      document.getElementById('modal-uploading').classList.add('show');
+      try {
+        const form = new FormData();
+        form.append('image', currentFile);
+        const r1 = await fetch(`https://api.imgbb.com/1/upload?key=${CONFIG.imgbbKey}`, { method:'POST', body:form });
+        const d1 = await r1.json();
+        if (!d1.success) throw new Error('Upload to storage failed. Please try again.');
+        const imageUrl = d1.data.url;
+        const r2 = await fetch(`${CONFIG.supabaseUrl}/rest/v1/${CONFIG.table}`, {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'apikey':CONFIG.supabaseKey, 'Authorization':`Bearer ${CONFIG.supabaseKey}`, 'Prefer':'return=minimal' },
+          body: JSON.stringify({ file_name: customName, file_url: imageUrl, file_type: currentFile.type })
+        });
+        if (!r2.ok) throw new Error('Failed to save image record. Please try again.');
+        showToast(`"${customName}" uploaded successfully.`);
+      } catch (err) { showToast(err.message, true); console.error(err); }
+      moveToNext();
+    }
+
+    function skipCurrent() { showToast('Image skipped.'); moveToNext(); }
+
+    function moveToNext() {
+      currentIndex++;
+      if (currentIndex < uploadQueue.length) openModal(uploadQueue[currentIndex], currentIndex);
+      else { closeModal(); document.getElementById('file-input').value = ''; loadImages(); }
+    }
+
+    function closeModal() {
+      document.getElementById('modal-overlay').classList.remove('open');
+      document.getElementById('modal-preview-img').src = '';
+      document.body.style.overflow = '';
+      uploadQueue = []; currentFile = null; currentIndex = 0;
+    }
+
+    // ============================================================
+    // LOAD IMAGES
+    // ============================================================
+    async function loadImages() {
+      const stL = document.getElementById('state-loading');
+      const stE = document.getElementById('state-empty');
+      document.getElementById('gallery-grid').innerHTML = '';
+      stL.style.display = 'block'; stE.style.display = 'none';
+      try {
+        const res = await fetch(
+          `${CONFIG.supabaseUrl}/rest/v1/${CONFIG.table}?select=*&order=created_at.desc`,
+          { headers:{ 'apikey':CONFIG.supabaseKey, 'Authorization':`Bearer ${CONFIG.supabaseKey}` } }
+        );
+        allImages = await res.json();
+        stL.style.display = 'none';
+        document.getElementById('count').textContent      = allImages.length;
+        document.getElementById('stat-total').textContent = allImages.length;
+        document.getElementById('gallery-sub').textContent =
+          `${allImages.length} photo${allImages.length !== 1 ? 's' : ''} stored in your vault`;
+        if (!allImages.length) { stE.style.display = 'block'; return; }
+        filterGallery();
+      } catch (err) {
+        stL.innerHTML = '<p style="color:#ff5e5e">Failed to load images. Please refresh the page.</p>';
+        console.error(err);
+      }
+    }
+
+    // ============================================================
+    // FILTER — Search + Sort
+    // .toLowerCase() se case insensitive search hoti hai
+    // ============================================================
+    function filterGallery() {
+      const query   = document.getElementById('search-input').value.toLowerCase().trim();
+      const sortVal = document.getElementById('sort-select').value;
+      const grid    = document.getElementById('gallery-grid');
+      const stE     = document.getElementById('state-empty');
+      const stNR    = document.getElementById('state-no-results');
+      const countEl = document.getElementById('search-results-count');
+
+      let filtered = allImages.filter(img => img.file_name.toLowerCase().includes(query));
+
+      if      (sortVal === 'newest') filtered.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      else if (sortVal === 'oldest') filtered.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+      else if (sortVal === 'az')     filtered.sort((a,b) => a.file_name.localeCompare(b.file_name));
+      else if (sortVal === 'za')     filtered.sort((a,b) => b.file_name.localeCompare(a.file_name));
+
+      countEl.style.display = query ? 'block' : 'none';
+      if (query) countEl.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''} found for "${query}"`;
+
+      stE.style.display  = 'none';
+      stNR.style.display = 'none';
+      if (!allImages.length)  { stE.style.display  = 'block'; grid.innerHTML = ''; return; }
+      if (!filtered.length)   { stNR.style.display = 'block'; grid.innerHTML = ''; return; }
+
+      grid.innerHTML = '';
+      filtered.forEach(img => {
+        const date = formatDate(img.created_at);
+        const card = document.createElement('div');
+        card.className = 'image-card';
+        card.innerHTML = `
+          <img src="${img.file_url}" alt="${img.file_name}" loading="lazy"
+            onclick="openLightbox('${img.file_url}','${escStr(img.file_name)}','${date}')">
+          <div class="card-overlay">
+            <div class="card-filename">${img.file_name}</div>
+            <div class="card-date">${date}</div>
+            <div class="card-actions">
+              <a class="card-btn" onclick="downloadOriginal('${img.file_url}','${escStr(img.file_name)}',event)">Save</a>
+              <button class="card-btn rename" onclick="openRename(${img.id},'${escStr(img.file_name)}',event)">Rename</button>
+              <button class="card-btn del" onclick="deleteImage(${img.id},event)">Delete</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // ============================================================
+    // DOWNLOAD ORIGINAL QUALITY
+    // Blob fetch se original file milti hai — quality loss nahi
+    // ============================================================
+    async function downloadOriginal(url, name, event) {
+      event.stopPropagation();
+      try {
+        showToast('Preparing download...');
+        const blob    = await fetch(url).then(r => r.blob());
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl; a.download = name; a.click();
+        URL.revokeObjectURL(blobUrl);
+        showToast('Download started.');
+      } catch { showToast('Download failed. Please try again.', true); }
+    }
+
+    // ============================================================
+    // RENAME
+    // ============================================================
+    function openRename(id, name, event) {
+      event.stopPropagation();
+      renameId = id;
+      const input = document.getElementById('rename-input');
+      input.value = name;
+      document.getElementById('rename-overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => { input.focus(); input.select(); }, 200);
+    }
+
+    async function saveRename() {
+      const newName = document.getElementById('rename-input').value.trim();
+      if (!newName) {
+        document.getElementById('rename-input').style.borderColor = '#ff5e5e';
+        setTimeout(() => { document.getElementById('rename-input').style.borderColor = ''; }, 1500);
+        return;
+      }
+      try {
+        const res = await fetch(`${CONFIG.supabaseUrl}/rest/v1/${CONFIG.table}?id=eq.${renameId}`, {
+          method:'PATCH',
+          headers:{ 'Content-Type':'application/json', 'apikey':CONFIG.supabaseKey, 'Authorization':`Bearer ${CONFIG.supabaseKey}`, 'Prefer':'return=minimal' },
+          body: JSON.stringify({ file_name: newName })
+        });
+        if (!res.ok) throw new Error();
+        showToast(`Renamed to "${newName}" successfully.`);
+        closeRename(); loadImages();
+      } catch { showToast('Failed to rename. Please try again.', true); }
+    }
+
+    function closeRename() {
+      document.getElementById('rename-overlay').classList.remove('open');
+      document.body.style.overflow = '';
+      renameId = null;
+    }
+
+    // ============================================================
+    // DELETE
+    // ============================================================
+    async function deleteImage(id, e) {
+      e.stopPropagation();
+      if (!confirm('Are you sure you want to delete this image? This action cannot be undone.')) return;
+      try {
+        const res = await fetch(`${CONFIG.supabaseUrl}/rest/v1/${CONFIG.table}?id=eq.${id}`, {
+          method:'DELETE', headers:{ 'apikey':CONFIG.supabaseKey, 'Authorization':`Bearer ${CONFIG.supabaseKey}` }
+        });
+        if (res.ok) { showToast('Image deleted successfully.'); loadImages(); }
+        else throw new Error();
+      } catch { showToast('Failed to delete image. Please try again.', true); }
+    }
+
+    // ============================================================
+    // LIGHTBOX
+    // ============================================================
+    function openLightbox(url, name, date) {
+      document.getElementById('lightbox-img').src = url;
+      document.getElementById('lightbox-name').textContent = name;
+      document.getElementById('lightbox-date').textContent = date;
+      document.getElementById('lightbox').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+      document.getElementById('lightbox-img').src = '';
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeLightbox(); closeRename(); }
+    });
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+    function formatDate(d) {
+      return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    }
+
+    function escStr(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+    // ============================================================
+    // TOAST
+    // ============================================================
+    let tt;
+    function showToast(msg, isErr = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = isErr ? 'toast err' : 'toast';
+      t.style.display = 'block';
+      clearTimeout(tt);
+      tt = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+  </script>
+</body>
+</html>
